@@ -1,0 +1,155 @@
+<!-- Toolbar -->
+<mat-toolbar color="primary" class="toolbar">
+  <mat-icon class="toolbar-icon">groups</mat-icon>
+  <span class="toolbar-title">TeamRegister</span>
+  <span class="spacer"></span>
+  <span class="user-info">
+    <mat-icon>account_circle</mat-icon>
+    {{ auth.getUser()?.name }}
+  </span>
+  <button mat-icon-button (click)="auth.logout()" matTooltip="Sign out">
+    <mat-icon>logout</mat-icon>
+  </button>
+</mat-toolbar>
+
+<!-- Alert Banner -->
+<div class="alert-banner" *ngIf="todayData?.alert">
+  <mat-icon>warning</mat-icon>
+  <strong>Office Capacity Alert!</strong>
+  {{ todayData?.officeCount }} out of 13 team members are coming to office today — limit exceeded (max 5)!
+</div>
+
+<!-- Loading Spinner -->
+<div class="spinner-container" *ngIf="loading">
+  <mat-spinner></mat-spinner>
+</div>
+
+<div class="content" *ngIf="!loading && todayData">
+
+  <!-- Date Header -->
+  <div class="date-header">
+    <h2>{{ todayFormatted }}</h2>
+  </div>
+
+  <!-- My Attendance Card -->
+  <mat-card class="my-status-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>how_to_reg</mat-icon>
+      <mat-card-title>My Attendance Today</mat-card-title>
+      <mat-card-subtitle>Let your team know your plan</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="status-buttons">
+        <button
+          mat-raised-button
+          [class.active-office]="myStatus === 'office'"
+          [disabled]="marking"
+          (click)="mark('office')"
+          class="status-btn office-btn">
+          <mat-icon>business</mat-icon>
+          Coming to Office
+        </button>
+
+        <button
+          mat-raised-button
+          [class.active-wfh]="myStatus === 'wfh'"
+          [disabled]="marking"
+          (click)="mark('wfh')"
+          class="status-btn wfh-btn">
+          <mat-icon>home</mat-icon>
+          Working from Home
+        </button>
+
+        <button
+          mat-raised-button
+          [class.active-absent]="myStatus === 'absent'"
+          [disabled]="marking"
+          (click)="mark('absent')"
+          class="status-btn absent-btn">
+          <mat-icon>event_busy</mat-icon>
+          Absent
+        </button>
+      </div>
+
+      <div class="current-status" [class]="'status-' + myStatus">
+        <mat-icon>{{ getStatusIcon(myStatus || 'absent') }}</mat-icon>
+        Current: <strong>{{ getStatusLabel(myStatus || 'absent') }}</strong>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Summary Cards -->
+  <div class="summary-row">
+    <mat-card class="summary-card office-summary" [class.alert-card]="todayData.alert">
+      <mat-card-content>
+        <div class="summary-icon"><mat-icon>business</mat-icon></div>
+        <div class="summary-count">{{ todayData.officeCount }}</div>
+        <div class="summary-label">In Office</div>
+        <div class="alert-tag" *ngIf="todayData.alert">⚠️ OVER LIMIT</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card wfh-summary">
+      <mat-card-content>
+        <div class="summary-icon"><mat-icon>home</mat-icon></div>
+        <div class="summary-count">{{ wfhMembers.length }}</div>
+        <div class="summary-label">WFH</div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="summary-card absent-summary">
+      <mat-card-content>
+        <div class="summary-icon"><mat-icon>person_off</mat-icon></div>
+        <div class="summary-count">{{ absentMembers.length }}</div>
+        <div class="summary-label">Absent / Not Set</div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Team Members Table -->
+  <mat-card class="team-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>people</mat-icon>
+      <mat-card-title>Team Attendance ({{ todayData.members.length }} members)</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="member-list">
+        <div
+          class="member-row"
+          *ngFor="let member of todayData.members"
+          [class.highlight-me]="member.id === auth.getUser()?.id">
+          <div class="member-avatar" [class]="'avatar-' + member.status">
+            <mat-icon>{{ getStatusIcon(member.status) }}</mat-icon>
+          </div>
+          <div class="member-info">
+            <span class="member-name">
+              {{ member.name }}
+              <span class="you-tag" *ngIf="member.id === auth.getUser()?.id">(You)</span>
+            </span>
+            <span class="member-username">{{ '@' + member.username }}</span>
+          </div>
+          <div class="member-status" [class]="'chip-' + member.status">
+            {{ getStatusLabel(member.status) }}
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- My History -->
+  <mat-card class="history-card" *ngIf="history.length > 0">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>history</mat-icon>
+      <mat-card-title>My Recent History (last 30 days)</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="history-list">
+        <div class="history-row" *ngFor="let rec of history">
+          <span class="history-date">{{ rec.date }}</span>
+          <span class="history-status" [class]="'chip-' + rec.status">{{ getStatusLabel(rec.status) }}</span>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+</div>
