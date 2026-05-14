@@ -5,6 +5,38 @@ const jwt = require('jsonwebtoken');
 const { Database } = require('node-sqlite3-wasm');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
+const winston = require('winston');
+
+// ── Logger ───────────────────────────────────────────────────────────────────
+const logsDir = path.join(__dirname, 'logs');
+fs.mkdirSync(logsDir, { recursive: true });
+
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      ),
+    }),
+    new winston.transports.File({
+      dirname: logsDir,
+      filename: 'error.log',
+      level: 'error',
+    }),
+    new winston.transports.File({
+      dirname: logsDir,
+      filename: 'combined.log',
+    }),
+  ],
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +44,21 @@ const JWT_SECRET = process.env.JWT_SECRET || 'team_register_secret_2024';
 
 app.use(cors());
 app.use(express.json());
+
+// HTTP request logger middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.info('HTTP request', {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - start,
+      ip: req.ip,
+    });
+  });
+  next();
+});
 
 // Rate limiters
 const loginLimiter = rateLimit({
@@ -31,6 +78,7 @@ app.use('/api/login', loginLimiter);
 app.use('/api/', apiLimiter);
 
 // Initialize SQLite database
+logger.info('Initializing SQLite database...');
 const db = new Database(path.join(__dirname, 'attendance.db'));
 
 // Create tables
@@ -83,10 +131,16 @@ for (const member of teamMembers) {
 function authenticate(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'Unauthorized' });
+  if (!token) {
+    logger.warn('Unauthorized access attempt', { url: req.originalUrl, ip: req.ip });
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Forbidden' });
+    if (err) {
+      logger.warn('Forbidden: invalid token', { url: req.originalUrl, ip: req.ip, error: err.message });
+      return res.status(403).json({ message: 'Forbidden' });
+    }
     req.user = user;
     next();
   });
@@ -94,13 +148,20 @@ function authenticate(req, res, next) {
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
+// GET /health — readiness probe
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // POST /api/login
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !bcrypt.compareSync(password, user.password)) {
+    logger.warn('Failed login attempt', { username, ip: req.ip });
     return res.status(401).json({ message: 'Invalid credentials' });
   }
+  logger.info('User logged in', { username: user.username, id: user.id });
   const token = jwt.sign({ id: user.id, username: user.username, name: user.name }, JWT_SECRET, { expiresIn: '8h' });
   res.json({ token, user: { id: user.id, username: user.username, name: user.name } });
 });
@@ -164,5 +225,5 @@ app.get('/{*path}', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`App running at http://localhost:${PORT}`);
+  logger.info(`App running at http://localhost:${PORT}`);
 });
