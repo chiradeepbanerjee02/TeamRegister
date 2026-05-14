@@ -1,0 +1,72 @@
+name: Deploy TeamRegister
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Stop existing processes
+        run: |
+          pkill -f "node server.js" || true
+          pkill -f "ng serve" || true
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Start backend
+        working-directory: backend
+        run: nohup node server.js > ../backend.log 2>&1 &
+        env:
+          PORT: 3000
+
+      - name: Wait for backend to be ready
+        run: |
+          echo "Waiting for backend to start..."
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Backend is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not become ready in time." >&2
+          exit 1
+
+      - name: Start frontend
+        working-directory: frontend
+        run: nohup npx ng serve --proxy-config proxy.conf.json --host 0.0.0.0 > ../frontend.log 2>&1 &
+
+      - name: Wait for frontend to be ready
+        run: |
+          echo "Waiting for frontend to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4200 > /dev/null 2>&1; then
+              echo "Frontend is up."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Frontend did not become ready in time." >&2
+          exit 1
+
+      - name: Deployment complete
+        run: echo "Backend and frontend are running."
