@@ -90,6 +90,67 @@ npx ng serve --proxy-config proxy.conf.json --open
 
 ---
 
+## Hosting & Deployment
+
+TeamRegister uses a **single-server** deployment model: the Express backend serves the compiled Angular frontend as static files, so only one process needs to run in production.
+
+### Architecture
+
+```
+Browser  →  Express (PORT)  →  /api/*  (REST API)
+                            →  /*      (Angular SPA static files)
+```
+
+### Production Build & Run
+
+**1. Build the Angular frontend**
+
+```bash
+cd frontend
+npm install
+npx ng build --configuration production
+# Output: frontend/dist/frontend/browser/
+```
+
+**2. Start the Express server**
+
+```bash
+cd backend
+npm install
+node server.js
+# Serves both API and frontend at http://localhost:3000
+```
+
+### Environment Variables
+
+| Variable     | Default  | Description                        |
+|--------------|----------|------------------------------------|
+| `PORT`       | `3000`   | Port the Express server listens on |
+| `JWT_SECRET` | *(none)* | Secret key for signing JWT tokens — **must be set in production** |
+
+Set these before starting the server for production:
+
+```bash
+export PORT=8080
+# Generate a strong random secret (at least 32 characters):
+export JWT_SECRET=$(openssl rand -base64 32)
+node server.js
+```
+
+### Deploying to a Cloud Platform
+
+The app can be deployed to any Node.js-compatible host (e.g. Render, Railway, Fly.io, Heroku).  
+Set the `PORT` and `JWT_SECRET` environment variables in your platform's dashboard, push the repository, and configure the **build command** and **start command** as follows:
+
+| Setting          | Value                                                                 |
+|------------------|-----------------------------------------------------------------------|
+| Build command    | `cd frontend && npm install && npx ng build --configuration production` |
+| Start command    | `cd backend && npm install && node server.js`                        |
+
+> **Note:** SQLite stores data in `backend/attendance.db`. On platforms with ephemeral file systems (e.g. Render free tier), data will reset on each redeploy. Use a persistent disk or migrate to a hosted database for long-term storage.
+
+---
+
 ## Alert Logic
 
 The system triggers an alert when `officeCount > 5`:
