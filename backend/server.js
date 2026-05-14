@@ -154,6 +154,15 @@ app.get('/api/users', authenticate, (req, res) => {
   res.json(users);
 });
 
+// Serve Angular static files
+const distPath = path.join(__dirname, '../frontend/dist/frontend/browser');
+app.use(express.static(distPath));
+
+// Angular catch-all (must be after API routes)
+app.get('/{*path}', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
 app.listen(PORT, () => {
-  console.log(`Backend API running at http://localhost:${PORT}`);
+  console.log(`App running at http://localhost:${PORT}`);
 });
