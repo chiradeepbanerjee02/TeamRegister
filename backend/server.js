@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Database = require('better-sqlite3');
+const { Database } = require('node-sqlite3-wasm');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 
