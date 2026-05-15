@@ -47,11 +47,11 @@ jobs:
           $backendDir = Join-Path $env:GITHUB_WORKSPACE "backend"
           $backendLog = Join-Path $env:GITHUB_WORKSPACE "backend.log"
           $scriptPath = Join-Path $env:GITHUB_WORKSPACE "run-backend.ps1"
-          @"
-`$env:PORT = '3000'
-Set-Location -LiteralPath '$backendDir'
-node server.js *>> '$backendLog' 2>&1
-"@ | Set-Content -Path $scriptPath -Encoding UTF8
+          @(
+            "`$env:PORT = '3000'",
+            "Set-Location -LiteralPath '$backendDir'",
+            "node server.js *>> '$backendLog' 2>&1"
+          ) -join "`n" | Set-Content -Path $scriptPath -Encoding UTF8
           $action = New-ScheduledTaskAction -Execute "pwsh.exe" `
             -Argument "-NonInteractive -WindowStyle Hidden -File `"$scriptPath`""
           $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 8)
@@ -92,10 +92,10 @@ node server.js *>> '$backendLog' 2>&1
           $frontendDir = Join-Path $env:GITHUB_WORKSPACE "frontend"
           $frontendLog = Join-Path $env:GITHUB_WORKSPACE "frontend.log"
           $scriptPath = Join-Path $env:GITHUB_WORKSPACE "run-frontend.ps1"
-          @"
-Set-Location -LiteralPath '$frontendDir'
-npx ng serve --proxy-config proxy.conf.json --host 0.0.0.0 *>> '$frontendLog' 2>&1
-"@ | Set-Content -Path $scriptPath -Encoding UTF8
+          @(
+            "Set-Location -LiteralPath '$frontendDir'",
+            "npx ng serve --proxy-config proxy.conf.json --host 0.0.0.0 *>> '$frontendLog' 2>&1"
+          ) -join "`n" | Set-Content -Path $scriptPath -Encoding UTF8
           $action = New-ScheduledTaskAction -Execute "pwsh.exe" `
             -Argument "-NonInteractive -WindowStyle Hidden -File `"$scriptPath`""
           $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 8)
