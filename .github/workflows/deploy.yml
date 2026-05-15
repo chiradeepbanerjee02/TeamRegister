@@ -50,14 +50,27 @@ jobs:
           Write-Host "Waiting for backend to start..."
           for ($i = 1; $i -le 15; $i++) {
             try {
-              Invoke-WebRequest -Uri "http://localhost:3000" -UseBasicParsing -ErrorAction Stop | Out-Null
-              Write-Host "Backend is up."
-              exit 0
+              $resp = Invoke-WebRequest -Uri "http://localhost:3000/health" -UseBasicParsing -ErrorAction Stop
+              if ($resp.StatusCode -eq 200) {
+                Write-Host "Backend is up."
+                exit 0
+              }
             } catch {}
             Start-Sleep -Seconds 2
           }
           Write-Error "Backend did not become ready in time."
           exit 1
+
+      - name: Output backend log on failure
+        if: failure()
+        run: |
+          $backendLog = Join-Path $env:GITHUB_WORKSPACE "backend.log"
+          if (Test-Path $backendLog) {
+            Write-Host "=== backend.log ==="
+            Get-Content $backendLog
+          } else {
+            Write-Host "No backend.log found."
+          }
 
       - name: Start frontend
         run: |

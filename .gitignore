@@ -10,6 +10,7 @@ backend/attendance.db
 # Logs
 *.log
 npm-debug.log*
+backend/logs/
 
 # OS files
 .DS_Store
