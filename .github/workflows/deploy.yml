@@ -17,10 +17,14 @@ jobs:
     steps:
       - name: Stop existing processes
         run: |
+          foreach ($task in @("TeamRegisterBackend", "TeamRegisterFrontend")) {
+            Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
+            Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+          }
           Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
             Where-Object { $_.CommandLine -match 'server\.js|ng\s+serve' } |
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-          Write-Host "Stopped existing node processes."
+          Write-Host "Stopped existing processes and scheduled tasks."
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,8 +46,19 @@ jobs:
         run: |
           $backendDir = Join-Path $env:GITHUB_WORKSPACE "backend"
           $backendLog = Join-Path $env:GITHUB_WORKSPACE "backend.log"
-          $cmd = "`$env:PORT='3000'; Set-Location '$backendDir'; node server.js *>> '$backendLog'"
-          Start-Process -FilePath "pwsh" -ArgumentList "-WindowStyle", "Hidden", "-Command", $cmd
+          $scriptPath = Join-Path $env:GITHUB_WORKSPACE "run-backend.ps1"
+          @"
+`$env:PORT = '3000'
+Set-Location -LiteralPath '$backendDir'
+node server.js *>> '$backendLog' 2>&1
+"@ | Set-Content -Path $scriptPath -Encoding UTF8
+          $action = New-ScheduledTaskAction -Execute "pwsh.exe" `
+            -Argument "-NonInteractive -WindowStyle Hidden -File `"$scriptPath`""
+          $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 8)
+          Register-ScheduledTask -TaskName "TeamRegisterBackend" -Action $action `
+            -Settings $settings -RunLevel Highest -Force | Out-Null
+          Start-ScheduledTask -TaskName "TeamRegisterBackend"
+          Write-Host "Backend scheduled task started."
 
       - name: Wait for backend to be ready
         run: |
@@ -76,8 +91,18 @@ jobs:
         run: |
           $frontendDir = Join-Path $env:GITHUB_WORKSPACE "frontend"
           $frontendLog = Join-Path $env:GITHUB_WORKSPACE "frontend.log"
-          $cmd = "Set-Location '$frontendDir'; npx ng serve --proxy-config proxy.conf.json --host 0.0.0.0 *>> '$frontendLog'"
-          Start-Process -FilePath "pwsh" -ArgumentList "-WindowStyle", "Hidden", "-Command", $cmd
+          $scriptPath = Join-Path $env:GITHUB_WORKSPACE "run-frontend.ps1"
+          @"
+Set-Location -LiteralPath '$frontendDir'
+npx ng serve --proxy-config proxy.conf.json --host 0.0.0.0 *>> '$frontendLog' 2>&1
+"@ | Set-Content -Path $scriptPath -Encoding UTF8
+          $action = New-ScheduledTaskAction -Execute "pwsh.exe" `
+            -Argument "-NonInteractive -WindowStyle Hidden -File `"$scriptPath`""
+          $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 8)
+          Register-ScheduledTask -TaskName "TeamRegisterFrontend" -Action $action `
+            -Settings $settings -RunLevel Highest -Force | Out-Null
+          Start-ScheduledTask -TaskName "TeamRegisterFrontend"
+          Write-Host "Frontend scheduled task started."
 
       - name: Wait for frontend to be ready
         run: |
